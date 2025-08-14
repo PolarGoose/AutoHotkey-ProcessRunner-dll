@@ -1,0 +1,36 @@
+import "oaidl.idl";
+import "ocidl.idl";
+
+[object, uuid(71CFC138-9CEB-44D9-9BE0-47F837760769), dual, nonextensible, pointer_default(unique)]
+interface IProcessRunnerResult : IDispatch
+{
+  [propget, id(1)] HRESULT StdOut([out, retval] BSTR* val);
+  [propget, id(2)] HRESULT StdErr([out, retval] BSTR* val);
+  [propget, id(3)] HRESULT ExitCode([out, retval] long* val);
+};
+
+[object, uuid(EBEE5E6D-67A8-4E0C-929A-701DE7ECB3B0), dual, nonextensible, pointer_default(unique)]
+interface IProcessRunner : IDispatch
+{
+  [id(1)] HRESULT Run([in] BSTR executablePath, [in, defaultvalue(0)] IDispatch* commandLineArgumentsJsArray, [in, defaultvalue("")] BSTR workingDirectory, [out, retval] IProcessRunnerResult** res);
+};
+
+[uuid(57BE232E-1766-429A-99EB-35A2164F868A), version(1.0)]
+library AutoHotkeyProcessRunnerLib
+{
+	importlib("stdole2.tlb");
+
+	[uuid(EB17CD61-A132-4765-9C97-5D2275D61E6C)]
+	coclass ProcessRunner
+	{
+		[default] interface IProcessRunner;
+	};
+
+  [uuid(4B834C97-015F-4B39-A405-B87D615E637B)]
+  coclass ProcessRunnerResult
+  {
+    [default] interface IProcessRunnerResult;
+  };
+};
+
+import "shobjidl.idl";

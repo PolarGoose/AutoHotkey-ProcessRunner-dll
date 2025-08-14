@@ -1,0 +1,134 @@
+#Requires AutoHotkey v2.0
+#DllLoad "%A_ScriptDir%/AutoHotkey-ProcessRunner.dll"
+
+Log(params*) {
+  FileAppend Format(params*) "`n", "*"
+}
+
+AssertEqual(actual, expected) {
+  if (actual != expected) {
+    throw Error(Format("actual='{1}'`nexpected='{2}'", expected, actual))
+  }
+}
+
+AssertContains(string, substring) {
+  if !InStr(string, substring, false, 1)
+    throw Error(Format("string`n{1}`ndoesn't contain`n{2}", string, substring))
+}
+
+AssertDoesNotContains(string, substring) {
+  if InStr(string, substring, false, 1)
+    throw Error(Format("string`n'{1}'`ncontains`n'{2}'", string, substring))
+}
+
+RunTest(fn) {
+  Log("RunTest: {1}", fn.Name)
+  try {
+    fn.Call()
+    Log("PASS")
+  } catch as e {
+    Log("Fail. Exception message:`n{1}", e.Message)
+    ExitApp 1
+  }
+}
+
+processRunner := ComObjFromPtr(DllCall("AutoHotkey-ProcessRunner\CreateProcessRunner"))
+
+Test_CanRunProcessWithoutParameters() {
+    result := processRunner.Run("C:/Program Files/Git/usr/bin/echo.exe")
+
+    AssertContains(result.StdOut, "usr\bin\echo.exe")
+    AssertEqual(result.StdErr, "")
+    AssertEqual(result.ExitCode, 0)
+}
+
+Test_CanRunProcessWithParameters() {
+    result := processRunner.Run("C:/Program Files/Git/usr/bin/echo.exe", ["123", "435"])
+
+    AssertContains(result.StdOut, "123 435")
+    AssertEqual(result.StdErr, "")
+    AssertEqual(result.ExitCode, 0)
+}
+
+Test_ThrowsIfExecutableDoesNotExists() {
+    exMessage := ""
+    try {
+      processRunner.Run("C:/nonExistingExecutable.exe")
+    } catch as e {
+      exMessage := e.Message
+    }
+
+    AssertContains(exMessage, "ProcessRunner.h:RunProcess:")
+    AssertContains(exMessage, "The executable not found 'C:/nonExistingExecutable.exe'")
+}
+
+Test_ThrowsIfCommanLineArgumentsContainWrongTypes() {
+    exMessage := ""
+    try {
+      processRunner.Run("C:/Program Files/Git/usr/bin/echo.exe", ["123", 1])
+    } catch as e {
+      exMessage := e.Message
+    }
+
+    AssertContains(exMessage, "The element with the index 2 is not a string but a variant type VT_I4")
+}
+
+Test_ThrowsIfNonExistedEnvironmentVariableIsUsed() {
+    exMessage := ""
+    try {
+      processRunner.Run("%NonExistentEnvVariable%/bin/echo.exe")
+    } catch as e {
+      exMessage := e.Message
+    }
+
+    AssertContains(exMessage, "The executable not found '%NonExistentEnvVariable%/bin/echo.exe'")
+}
+
+Test_CanUseEnvironmentVariablesInExecutablePath() {
+    result := processRunner.Run("%ProgramFiles%\Git\usr\bin\echo.exe", ["123", "435"])
+    AssertContains(result.StdOut, "123 435")
+}
+
+Test_CanRunAnExecutableThatPrintsToStdErr() {
+  result := processRunner.Run("C:/Program Files/Git/usr/bin/cat.exe", ["C:/non_existent_file"])
+  AssertEqual(result.StdOut, "")
+  AssertEqual(result.StdErr, "/usr/bin/cat: 'C:/non_existent_file': No such file or directory`n")
+  AssertEqual(result.ExitCode, 1)
+}
+
+Test_ThrowsIfExeIsNotExecutable() {
+  exMessage := ""
+  try {
+    processRunner.Run("C:/Program Files")
+  } catch as e {
+    exMessage := e.Message
+  }
+  AssertContains(exMessage, "The file 'C:/Program Files' is not executable")
+
+  try {
+    processRunner.Run("C:/Windows/System32/mssecuser.dll")
+  } catch as e {
+    exMessage := e.Message
+  }
+  AssertContains(exMessage, "The file 'C:/Windows/System32/mssecuser.dll' is not executable")
+}
+
+Test_CanSpecifyWorkingDirectory() {
+  res := processRunner.Run("C:/Program Files/Git/usr/bin/file.exe", ["--mime-type", "--brief", "regedit.exe"], "C:/Windows")
+  AssertEqual(res.StdErr, "")
+  AssertEqual(res.ExitCode, 0)
+
+  res := processRunner.Run("C:/Program Files/Git/usr/bin/file.exe", ["--mime-type", "--brief", "Git"], "%ProgramW6432%")
+  AssertEqual(res.StdErr, "")
+  assertEqual(res.ExitCode, 0)
+}
+
+RunTest(Test_CanRunProcessWithoutParameters)
+RunTest(Test_CanRunProcessWithParameters)
+RunTest(Test_ThrowsIfExecutableDoesNotExists)
+RunTest(Test_ThrowsIfCommanLineArgumentsContainWrongTypes)
+RunTest(Test_ThrowsIfNonExistedEnvironmentVariableIsUsed)
+RunTest(Test_CanUseEnvironmentVariablesInExecutablePath)
+RunTest(Test_CanRunAnExecutableThatPrintsToStdErr)
+RunTest(Test_ThrowsIfExeIsNotExecutable)
+RunTest(Test_CanSpecifyWorkingDirectory)
